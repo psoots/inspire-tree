@@ -37,6 +37,7 @@ function InspireTree(opts) {
     // Assign defaults
     tree.config = defaultsDeep(opts, {
         allowSelection: noop,
+        checkbox: false,
         contextMenu: false,
         dragTargets: false,
         multiselect: false,
@@ -46,6 +47,11 @@ function InspireTree(opts) {
         sort: false,
         tabindex: -1
     });
+
+    if (tree.config.checkbox) {
+        tree.config.multiselect = true;
+        tree.preventDeselection = true;
+    }
 
     // Cache some configs
     var isDynamic = isFunction(tree.config.data);
@@ -253,7 +259,19 @@ function InspireTree(opts) {
      */
     TreeNode.prototype.deselect = function() {
         if (!tree.config.requireSelection || tree.getSelectedNodes().length > 1) {
+            var node = this;
+            dom.batch();
+
+            // If using checkbox model, select all children
+            if (tree.config.checkbox && node.hasChildren()) {
+                node.children.recurseDown(function(child) {
+                    return child.deselect();
+                });
+            }
+
             baseStateChange('selected', false, 'deselected', this);
+
+            dom.end();
         }
 
         return this;
@@ -534,17 +552,15 @@ function InspireTree(opts) {
      * and rerendering to the live DOM, next time applyChanges is called.
      *
      * @category TreeNode
-     * @param {boolean} noRecursion Skip recursing up parent tree.
      * @return {TreeNode} Node object.
      */
-    TreeNode.prototype.markDirty = function(noRecursion) {
-        if (noRecursion) {
+    TreeNode.prototype.markDirty = function() {
+        if (!this.itree.dirty) {
             this.itree.dirty = true;
-        }
-        else {
-            this.recurseUp(function(node) {
-                return node.markDirty(true);
-            });
+
+            if (this.hasParent()) {
+                this.getParent().markDirty();
+            }
         }
 
         return this;
@@ -687,6 +703,28 @@ function InspireTree(opts) {
     };
 
     /**
+     * Updates the indeterminate state of this node.
+     *
+     * Only available when checkbox=true.
+     * True if some, but not all children are selected.
+     * False if no children are selected.
+     *
+     * @category TreeNode
+     * @return {TreeNode} Node object.
+     */
+    TreeNode.prototype.refreshIndeterminateState = function() {
+        this.itree.state.indeterminate = false;
+
+        if (tree.config.checkbox && this.hasChildren()) {
+            var selected = this.children.getSelectedNodes().length;
+            this.itree.state.indeterminate = selected > 0 && selected !== this.children.length;
+            console.log(this.text, this.itree.state.indeterminate);
+        }
+
+        return this;
+    };
+
+    /**
      * Remove a node from the tree.
      *
      * @category TreeNode
@@ -745,6 +783,19 @@ function InspireTree(opts) {
             }
 
             node.itree.state.selected = true;
+
+            // If using checkbox model and we have children
+            if (tree.config.checkbox) {
+                if (node.hasChildren()) {
+                    node.children.recurseDown(function(child) {
+                        return child.select();
+                    });
+                }
+
+                if (node.hasParent()) {
+                    node.getParent().refreshIndeterminateState();
+                }
+            }
 
             // Emit this event
             tree.emit('node.selected', node);
@@ -1031,6 +1082,16 @@ function InspireTree(opts) {
     };
 
     /**
+     * Returns an array of selected nodes.
+     *
+     * @category TreeNodes
+     * @return {TreeNodes} Array of node objects.
+     */
+    TreeNodes.prototype.getSelectedNodes = function() {
+        return this.flatten('selected');
+    };
+
+    /**
      * Iterate down all nodes and any children.
      *
      * @category TreeNodes
@@ -1283,6 +1344,7 @@ function InspireTree(opts) {
         // Disabled by default
         state.focused = state.focused || false;
         state.hidden = state.hidden || false;
+        state.indeterminate = state.indeterminate || false;
         state.loading = state.loading || false;
         state.removed = state.removed || false;
         state.selected = state.selected || false;
@@ -1457,11 +1519,10 @@ function InspireTree(opts) {
      * Returns a flat array of selected nodes.
      *
      * @category Tree
-     * @param {TreeNodes} nodes Array of node objects to search within.
      * @return {TreeNodes} Selected nodes.
      */
-    tree.getSelectedNodes = function(nodes) {
-        return (nodes || model).flatten('selected');
+    tree.getSelectedNodes = function() {
+        return model.getSelectedNodes();
     };
 
     /**
