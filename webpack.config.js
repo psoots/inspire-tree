@@ -42,24 +42,12 @@ if (PROD) {
 var externals = {};
 if (!BUNDLE) {
     externals = {
-        'lodash.assign': 'var _.assign',
-        'lodash.clonedeep': 'var _.cloneDeep',
-        'lodash.defaults': 'var _.defaults',
-        'lodash.foreach': 'var _.forEach',
-        'lodash.find': 'var _.find',
-        'lodash.findindex': 'var _.findIndex',
-        'lodash.findlast': 'var _.findLast',
-        'lodash.isarray': 'var _.isArray',
-        'lodash.isempty': 'var _.isEmpty',
-        'lodash.isfunction': 'var _.isFunction',
-        'lodash.isnumber': 'var _.isNumber',
-        'lodash.isobject': 'var _.isObject',
-        'lodash.isregexp': 'var _.isRegexp',
-        'lodash.isstring': 'var _.isString',
-        'lodash.remove': 'var _.remove',
-        'lodash.slice': 'var _.slice',
-        'lodash.sortby': 'var _.sortBy',
-        'lodash.transform': 'var _.transform'
+        lodash: {
+            commonjs: 'lodash',
+            commonjs2: 'lodash',
+            amd: 'lodash',
+            root: '_'
+        }
     };
 }
 
